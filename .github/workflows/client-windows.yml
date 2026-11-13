@@ -1,0 +1,56 @@
+name: client-windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 180
+    steps:
+      - name: check out the commit under test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/rust
+
+      - name: build the client
+        run: cargo build --locked --release -p mcrs_minecraft_client --bin mcrs_minecraft_client
+
+      # The binary reads its asset folder from beside the executable, and the game jar it also
+      # needs is not ours to ship: the first start downloads it into %APPDATA%\.minecraft.
+      - name: assemble the bundle
+        id: bundle
+        shell: pwsh
+        run: |
+          $snapshot = (Get-Content assets/minecraft/version.json -Raw | ConvertFrom-Json).id
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "snapshot=$snapshot"
+          New-Item -ItemType Directory -Force dist/assets/minecraft | Out-Null
+          Copy-Item target/release/mcrs_minecraft_client.exe dist/
+          Copy-Item assets/minecraft/version.json dist/assets/minecraft/
+          Copy-Item -Recurse assets/mcrs dist/assets/mcrs
+          @(
+            "mcrs client, Windows x86_64, Minecraft $snapshot."
+            ""
+            'Run mcrs_minecraft_client.exe from this folder: it reads assets/ from beside itself.'
+            'The first start downloads the pinned game jar into %APPDATA%\.minecraft, so the'
+            'window opens after a pause. A world folder goes in as the first argument.'
+          ) | Set-Content dist/README.txt
+
+      - name: upload the bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mcrs_minecraft_client-windows-x86_64-${{ steps.bundle.outputs.snapshot }}
+          path: dist
+          if-no-files-found: error
