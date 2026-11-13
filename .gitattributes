@@ -1,4 +1,6 @@
 assets/minecraft/** linguist-generated
+# Compared byte for byte with the jar's own copy, so git must not rewrite its line endings.
+assets/minecraft/version.json text eol=lf
 assets/mcrs/reports/** linguist-generated
 assets/mcrs/block_definition/** linguist-generated
 assets/mcrs/item_definition/** linguist-generated
